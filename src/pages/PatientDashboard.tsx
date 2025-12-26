@@ -347,29 +347,29 @@ export default function PatientDashboard() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="flex flex-row md:flex-col gap-4 md:gap-6">
+          <div className="flex flex-row md:flex-col gap-4 md:gap-32">
             <button
               onClick={handleVoiceMessage}
               className={`w-full aspect-square rounded-full flex flex-col items-center justify-center transition-all duration-300 ${
                 isRecording
                   ? 'bg-blue-600 hover:bg-blue-700 scale-105 animate-pulse'
                   : 'bg-blue-500 hover:bg-blue-600'
-              } text-white shadow-2xl active:scale-95`}
+              } text-white shadow-2xl active:scale-95 p-4`}
               aria-label="Voice health message"
             >
               <MessageSquare size={80} strokeWidth={2} />
-              <span className="text-2xl md:text-3xl font-bold mt-4">Voice Message</span>
-              <span className="text-lg md:text-xl mt-2">Health Report</span>
+              <span className="text-2xl md:text-3xl font-bold mt-4 text-center px-2">Voice Message</span>
+              <span className="text-lg md:text-xl mt-2 text-center px-2">Health Report</span>
             </button>
 
             <button
               onClick={handleSOS}
-              className="w-full aspect-square rounded-full bg-red-500 hover:bg-red-600 text-white shadow-2xl flex flex-col items-center justify-center transition-all active:scale-95"
+              className="w-full aspect-square rounded-full bg-red-500 hover:bg-red-600 text-white shadow-2xl flex flex-col items-center justify-center transition-all active:scale-95 p-4"
               aria-label="SOS emergency button"
             >
               <AlertCircle size={80} strokeWidth={2} />
-              <span className="text-2xl md:text-3xl font-bold mt-4">SOS</span>
-              <span className="text-lg md:text-xl mt-2">Emergency</span>
+              <span className="text-2xl md:text-3xl font-bold mt-4 text-center px-2">SOS</span>
+              <span className="text-lg md:text-xl mt-2 text-center px-2">Emergency</span>
             </button>
           </div>
 
@@ -735,15 +735,15 @@ export default function PatientDashboard() {
             )}
           </div>
 
-          <div className="flex flex-row md:flex-col gap-4 md:gap-6">
+          <div className="flex flex-row md:flex-col gap-4 md:gap-32">
             <button
               onClick={handleMedicineAssistant}
-              className="w-full aspect-square rounded-full bg-green-500 hover:bg-green-600 text-white shadow-2xl flex flex-col items-center justify-center transition-all active:scale-95"
+              className="w-full aspect-square rounded-full bg-green-500 hover:bg-green-600 text-white shadow-2xl flex flex-col items-center justify-center transition-all active:scale-95 p-4"
               aria-label="Medicine assistant"
             >
               <Pill size={80} strokeWidth={2} />
-              <span className="text-2xl md:text-3xl font-bold mt-4">Medicine</span>
-              <span className="text-lg md:text-xl mt-2">Assistant</span>
+              <span className="text-2xl md:text-3xl font-bold mt-4 text-center px-2">Medicine</span>
+              <span className="text-lg md:text-xl mt-2 text-center px-2">Assistant</span>
             </button>
 
             <button
@@ -752,12 +752,12 @@ export default function PatientDashboard() {
                 isCameraActive
                   ? 'bg-orange-600 hover:bg-orange-700 scale-105'
                   : 'bg-orange-500 hover:bg-orange-600'
-              } text-white shadow-2xl active:scale-95`}
+              } text-white shadow-2xl active:scale-95 p-4`}
               aria-label="Object detection"
             >
               <Camera size={80} strokeWidth={2} />
-              <span className="text-2xl md:text-3xl font-bold mt-4">Object</span>
-              <span className="text-lg md:text-xl mt-2">Detection</span>
+              <span className="text-2xl md:text-3xl font-bold mt-4 text-center px-2">Object</span>
+              <span className="text-lg md:text-xl mt-2 text-center px-2">Detection</span>
             </button>
           </div>
         </div>
