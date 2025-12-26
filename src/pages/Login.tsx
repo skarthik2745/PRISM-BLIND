@@ -12,7 +12,9 @@ export default function Login() {
   const { signIn } = useAuth();
 
   useEffect(() => {
-    voiceService.speak('Welcome to Voice Patient Monitoring System. Please tap the microphone button to begin voice login.').catch(() => {});
+    voiceService
+      .speak('Welcome to PRISM for Blind, a Platform for Remote Integrated Smart Monitoring. Please tap the microphone button to begin voice login.')
+      .catch(() => {});
   }, []);
 
   const handleVoiceLogin = async () => {
@@ -67,11 +69,14 @@ export default function Login() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex flex-col items-center justify-center p-4">
       <div className="text-center mb-12">
-        <h1 className="text-5xl md:text-6xl font-bold text-blue-900 mb-4">
-          Voice Patient Monitoring
+        <h1 className="text-5xl md:text-6xl font-bold text-blue-900 mb-2">
+          PRISM for Blind
         </h1>
-        <p className="text-2xl md:text-3xl text-blue-700">
-          Tap microphone to login with your voice
+        <p className="text-xl md:text-2xl text-slate-600">
+          Platform for Remote Integrated Smart Monitoring
+        </p>
+        <p className="text-2xl md:text-3xl text-blue-700 mt-4">
+          Tap the microphone to login with your voice
         </p>
       </div>
 
