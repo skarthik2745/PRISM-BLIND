@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { MessageSquare, AlertCircle, Pill, Camera, LogOut, XCircle, Users, Clock, Save, Activity, ChevronUp, ChevronDown } from 'lucide-react';
 import { voiceService } from '../services/voiceService';
+import * as tf from '@tensorflow/tfjs';
+import * as cocoSsd from '@tensorflow-models/coco-ssd';
 import { useAuth } from '../contexts/AuthContext';
 import { localStorageService } from '../lib/localStorage';
 import { MedicineSchedule, SOSAlert, EmergencyContact } from '../types';
@@ -9,12 +11,15 @@ export default function PatientDashboard() {
   const { user, signOut } = useAuth();
   const [isRecording, setIsRecording] = useState(false);
   const sosTimeoutRef = useRef<any>(null);
+  const detectionLoopRef = useRef<boolean>(true);
+  const videoStreamRef = useRef<MediaStream | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const lastSosPressRef = useRef<number>(0);
   const [activeAlert, setActiveAlert] = useState<SOSAlert | null>(null);
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [activeTab, setActiveTab] = useState<'health_card' | 'contacts' | 'medicine'>('health_card');
   const [healthCard, setHealthCard] = useState({
-    patientId: '',
     fullName: '',
     age: '',
     gender: '',
@@ -61,7 +66,6 @@ export default function PatientDashboard() {
       } else {
         setHealthCard(prev => ({
           ...prev,
-          patientId: user.id,
           fullName: user.full_name || '',
           age: user.age?.toString() || '',
           gender: user.gender || ''
@@ -259,27 +263,128 @@ export default function PatientDashboard() {
     }
   };
 
+  const stopObjectDetection = () => {
+    detectionLoopRef.current = false;
+    if (videoStreamRef.current) {
+      videoStreamRef.current.getTracks().forEach((track) => track.stop());
+      videoStreamRef.current = null;
+    }
+    if (canvasRef.current) {
+      const ctx = canvasRef.current.getContext('2d');
+      ctx?.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+    }
+    setIsCameraActive(false);
+    voiceService.speak('Object detection stopped.');
+  };
+
   const handleObjectDetection = async () => {
+    if (isCameraActive) {
+      stopObjectDetection();
+      return;
+    }
+
     setIsCameraActive(true);
-    await voiceService.speak('Object detection started. Camera is now active.');
+    detectionLoopRef.current = true;
+    await voiceService.speak('Object detection started. Please wait while the model loads.');
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      const videoElement = document.createElement('video');
-      videoElement.srcObject = stream;
-      await videoElement.play();
+      // Ensure TensorFlow.js is ready
+      await tf.ready();
+      
+      // Load the COCO-SSD model. This is a pre-trained general object detector.
+      // For your custom model in 'public/object detection', you would use:
+      // const model = await tf.loadGraphModel('/object detection/model.json');
+      // You would also need to write custom code to process the model's output tensors.
+      const model = await cocoSsd.load();
+      await voiceService.speak('Model loaded. Starting camera.');
 
-      await voiceService.speak('Camera is ready. This feature detects objects and obstacles around you.');
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { facingMode: 'environment' } 
+      });
+      videoStreamRef.current = stream;
 
-      setTimeout(() => {
-        stream.getTracks().forEach((track) => track.stop());
-        setIsCameraActive(false);
-        voiceService.speak('Object detection stopped.');
-      }, 10000);
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.onloadedmetadata = () => {
+          videoRef.current?.play();
+        };
+      }
+
+      await voiceService.speak('Camera is ready. Detecting objects. Tap the button again to stop.');
+
+      let lastAnnouncedTime = 0;
+      const ANNOUNCEMENT_DELAY = 2000; // 2 seconds
+
+      const detectFrame = async () => {
+        if (!detectionLoopRef.current || !videoRef.current) {
+          return;
+        }
+
+        if (videoRef.current.readyState === 4) {
+          const video = videoRef.current;
+          const predictions = await model.detect(video);
+
+          // Draw on canvas
+          if (canvasRef.current) {
+            const canvas = canvasRef.current;
+            const ctx = canvas.getContext('2d');
+            
+            if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+              canvas.width = video.videoWidth;
+              canvas.height = video.videoHeight;
+            }
+
+            if (ctx) {
+              ctx.clearRect(0, 0, canvas.width, canvas.height);
+              predictions.forEach(prediction => {
+                const [x, y, width, height] = prediction.bbox;
+                const maxSize = Math.max(width, height);
+                const estimatedMeters = (300 / maxSize).toFixed(1);
+
+                ctx.strokeStyle = '#00FF00';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(x, y, width, height);
+                ctx.fillStyle = '#00FF00';
+                ctx.font = '18px Arial';
+                ctx.fillText(`${prediction.class} (${estimatedMeters}m) ${Math.round(prediction.score * 100)}%`, x, y > 10 ? y - 5 : 10);
+              });
+            }
+          }
+
+          const now = Date.now();
+          if (now - lastAnnouncedTime > ANNOUNCEMENT_DELAY) {
+            const highConfidencePredictions = predictions.filter(p => p.score > 0.66);
+            
+            if (highConfidencePredictions.length > 0) {
+              // Sort by area (largest first -> closest)
+              highConfidencePredictions.sort((a, b) => (b.bbox[2] * b.bbox[3]) - (a.bbox[2] * a.bbox[3]));
+              
+              const primary = highConfidencePredictions[0];
+              const [_, __, width, height] = primary.bbox;
+              
+              // Heuristic: Distance ~ Constant / Size. Assuming 300px is roughly 1 meter for average object.
+              const maxSize = Math.max(width, height);
+              const estimatedMeters = (300 / maxSize).toFixed(1);
+              
+              const message = `${primary.class} is ${estimatedMeters} meters away`;
+              voiceService.speak(message);
+              lastAnnouncedTime = now;
+            }
+          }
+        }
+
+        requestAnimationFrame(detectFrame);
+      };
+
+      detectFrame();
     } catch (error) {
-      console.error('Camera error:', error);
-      await voiceService.speak('Camera access denied. Please enable camera permissions.');
-      setIsCameraActive(false);
+      console.error('Object detection error:', error);
+      let errorMessage = 'An error occurred during object detection.';
+      if (error instanceof Error && (error.name === 'NotAllowedError' || error.message.includes('Permission denied'))) {
+        errorMessage = 'Camera access denied. Please enable camera permissions in your browser settings.';
+      }
+      await voiceService.speak(errorMessage);
+      stopObjectDetection();
     }
   };
 
@@ -378,30 +483,24 @@ export default function PatientDashboard() {
               <>
                 <div className="flex border-b relative pr-12">
                   <button
-                    onClick={() => setActiveTab('health_card')}
-                    className={`flex-1 py-4 text-lg font-semibold flex items-center justify-center gap-2 transition-colors ${
+                    onClick={() => setActiveTab('health_card')} className={`flex-1 py-4 text-lg font-semibold transition-colors ${
                       activeTab === 'health_card' ? 'bg-blue-50 text-blue-600 border-b-2 border-blue-600' : 'text-slate-500 hover:bg-slate-50'
                     }`}
                   >
-                    <Activity size={20} />
                     Health Card
                   </button>
                   <button
-                    onClick={() => setActiveTab('contacts')}
-                    className={`flex-1 py-4 text-lg font-semibold flex items-center justify-center gap-2 transition-colors ${
+                    onClick={() => setActiveTab('contacts')} className={`flex-1 py-4 text-lg font-semibold transition-colors ${
                       activeTab === 'contacts' ? 'bg-blue-50 text-blue-600 border-b-2 border-blue-600' : 'text-slate-500 hover:bg-slate-50'
                     }`}
                   >
-                    <Users size={20} />
                     Contacts
                   </button>
                   <button
-                    onClick={() => setActiveTab('medicine')}
-                    className={`flex-1 py-4 text-lg font-semibold flex items-center justify-center gap-2 transition-colors ${
+                    onClick={() => setActiveTab('medicine')} className={`flex-1 py-4 text-lg font-semibold transition-colors ${
                       activeTab === 'medicine' ? 'bg-blue-50 text-blue-600 border-b-2 border-blue-600' : 'text-slate-500 hover:bg-slate-50'
                     }`}
                   >
-                    <Clock size={20} />
                     Medicine
                   </button>
                   <button
@@ -433,10 +532,6 @@ export default function PatientDashboard() {
                       <div className="bg-slate-50 p-4 rounded-lg space-y-4">
                         <h4 className="font-semibold text-slate-700 border-b pb-2">Patient Basic Info</h4>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Patient ID</label>
-                            <input type="text" value={healthCard.patientId} readOnly className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-slate-100" />
-                          </div>
                           <div>
                             <label className="block text-sm font-medium text-slate-700 mb-1">Full Name</label>
                             <input type="text" value={healthCard.fullName} onChange={e => setHealthCard({...healthCard, fullName: e.target.value})} className="w-full px-3 py-2 border border-slate-300 rounded-lg" />
@@ -530,7 +625,6 @@ export default function PatientDashboard() {
                       <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
                         <h4 className="text-lg font-bold text-slate-800 mb-4 border-b pb-2">Patient Info</h4>
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-y-4 gap-x-8">
-                          <div><span className="text-sm text-slate-500 block">ID</span> <span className="font-medium">{healthCard.patientId}</span></div>
                           <div><span className="text-sm text-slate-500 block">Name</span> <span className="font-medium">{healthCard.fullName}</span></div>
                           <div><span className="text-sm text-slate-500 block">Age/Gender</span> <span className="font-medium">{healthCard.age} / {healthCard.gender}</span></div>
                           <div><span className="text-sm text-slate-500 block">Blood Group</span> <span className="font-medium">{healthCard.bloodGroup || '-'}</span></div>
@@ -782,6 +876,30 @@ export default function PatientDashboard() {
                 <span className="text-3xl font-bold">Cancel SOS</span>
               </button>
             </div>
+          </div>
+        )}
+
+        {isCameraActive && (
+          <div className="fixed inset-0 z-50 bg-black bg-opacity-90 flex flex-col items-center justify-center p-4">
+            <div className="relative w-full max-w-4xl aspect-video bg-black rounded-lg overflow-hidden border-2 border-slate-700">
+              <video
+                ref={videoRef}
+                className="absolute inset-0 w-full h-full object-contain"
+                playsInline
+                muted
+              />
+              <canvas
+                ref={canvasRef}
+                className="absolute inset-0 w-full h-full object-contain"
+              />
+            </div>
+            <button
+              onClick={stopObjectDetection}
+              className="mt-8 px-8 py-4 bg-red-600 hover:bg-red-700 text-white rounded-full text-xl font-bold flex items-center gap-3 transition-all active:scale-95 shadow-lg"
+            >
+              <XCircle size={32} />
+              Stop Detection
+            </button>
           </div>
         )}
       </div>

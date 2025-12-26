@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Smart Object Detection</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<h1>Smart Object Detection System</h1>
+
+<div class="container">
+    <div class="box camera-box">
+        <h2>Camera Feed</h2>
+        <img src="/video_feed">
+    </div>
+
+    <div class="box output-box">
+        <h2>Detection Output</h2>
+        <div id="output">Waiting...</div>
+    </div>
+</div>
+
+<script>
+setInterval(() => {
+    fetch('/text_feed')
+        .then(response => response.text())
+        .then(data => {
+            document.getElementById("output").innerText = data;
+        });
+}, 1500);
+</script>
+
+</body>
+</html>
