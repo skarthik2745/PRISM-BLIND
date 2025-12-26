@@ -72,6 +72,11 @@ export default function Login() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex flex-col items-center justify-center p-4">
       <div className="text-center mb-12">
+        <img
+          src="/prism.jpeg"
+          alt="PRISM Logo"
+          className="w-40 h-40 mx-auto mb-6 border-4 border-orange-500 object-cover shadow-lg"
+        />
         <h1 className="text-5xl md:text-6xl font-bold text-blue-900 mb-2">
           PRISM for Blind
         </h1>
