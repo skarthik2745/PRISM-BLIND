@@ -12,9 +12,12 @@ export default function Login() {
   const { signIn } = useAuth();
 
   useEffect(() => {
-    voiceService
-      .speak('Welcome to PRISM for Blind, a Platform for Remote Integrated Smart Monitoring. Please tap the microphone button to begin voice login.')
-      .catch(() => {});
+    const timer = setTimeout(() => {
+      voiceService
+        .speak('Welcome to PRISM for Blind, a Platform for Remote Integrated Smart Monitoring. Please tap the microphone button to begin voice login.')
+        .catch(() => {});
+    }, 1000);
+    return () => clearTimeout(timer);
   }, []);
 
   const handleVoiceLogin = async () => {
