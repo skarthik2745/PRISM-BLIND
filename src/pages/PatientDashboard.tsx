@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { MessageSquare, AlertCircle, Pill, Camera, LogOut, XCircle, Users, Clock, Save, Activity } from 'lucide-react';
+import { MessageSquare, AlertCircle, Pill, Camera, LogOut, XCircle, Users, Clock, Save, Activity, ChevronUp, ChevronDown } from 'lucide-react';
 import { voiceService } from '../services/voiceService';
 import { useAuth } from '../contexts/AuthContext';
 import { localStorageService } from '../lib/localStorage';
@@ -44,6 +44,7 @@ export default function PatientDashboard() {
   });
   const [contacts, setContacts] = useState<EmergencyContact[]>([]);
   const [medicines, setMedicines] = useState<MedicineSchedule[]>([]);
+  const [isNavVisible, setIsNavVisible] = useState(true);
 
   useEffect(() => {
     const welcomeMessage = `Welcome to your patient dashboard. Top left button for voice health message. Top right button for S O S emergency. Bottom left button for medicine assistant. Bottom right button for object detection.`;
@@ -372,38 +373,47 @@ export default function PatientDashboard() {
             </button>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-xl overflow-hidden flex flex-col h-full min-h-[400px]">
-            <div className="flex border-b">
-              <button
-                onClick={() => setActiveTab('health_card')}
-                className={`flex-1 py-4 text-lg font-semibold flex items-center justify-center gap-2 transition-colors ${
-                  activeTab === 'health_card' ? 'bg-blue-50 text-blue-600 border-b-2 border-blue-600' : 'text-slate-500 hover:bg-slate-50'
-                }`}
-              >
-                <Activity size={20} />
-                Health Card
-              </button>
-              <button
-                onClick={() => setActiveTab('contacts')}
-                className={`flex-1 py-4 text-lg font-semibold flex items-center justify-center gap-2 transition-colors ${
-                  activeTab === 'contacts' ? 'bg-blue-50 text-blue-600 border-b-2 border-blue-600' : 'text-slate-500 hover:bg-slate-50'
-                }`}
-              >
-                <Users size={20} />
-                Contacts
-              </button>
-              <button
-                onClick={() => setActiveTab('medicine')}
-                className={`flex-1 py-4 text-lg font-semibold flex items-center justify-center gap-2 transition-colors ${
-                  activeTab === 'medicine' ? 'bg-blue-50 text-blue-600 border-b-2 border-blue-600' : 'text-slate-500 hover:bg-slate-50'
-                }`}
-              >
-                <Clock size={20} />
-                Medicine
-              </button>
-            </div>
+          <div className={`transition-all duration-300 ${isNavVisible ? 'bg-white rounded-2xl shadow-xl overflow-hidden flex flex-col h-full min-h-[400px]' : 'h-auto flex justify-center'}`}>
+            {isNavVisible ? (
+              <>
+                <div className="flex border-b relative pr-12">
+                  <button
+                    onClick={() => setActiveTab('health_card')}
+                    className={`flex-1 py-4 text-lg font-semibold flex items-center justify-center gap-2 transition-colors ${
+                      activeTab === 'health_card' ? 'bg-blue-50 text-blue-600 border-b-2 border-blue-600' : 'text-slate-500 hover:bg-slate-50'
+                    }`}
+                  >
+                    <Activity size={20} />
+                    Health Card
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('contacts')}
+                    className={`flex-1 py-4 text-lg font-semibold flex items-center justify-center gap-2 transition-colors ${
+                      activeTab === 'contacts' ? 'bg-blue-50 text-blue-600 border-b-2 border-blue-600' : 'text-slate-500 hover:bg-slate-50'
+                    }`}
+                  >
+                    <Users size={20} />
+                    Contacts
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('medicine')}
+                    className={`flex-1 py-4 text-lg font-semibold flex items-center justify-center gap-2 transition-colors ${
+                      activeTab === 'medicine' ? 'bg-blue-50 text-blue-600 border-b-2 border-blue-600' : 'text-slate-500 hover:bg-slate-50'
+                    }`}
+                  >
+                    <Clock size={20} />
+                    Medicine
+                  </button>
+                  <button
+                    onClick={() => setIsNavVisible(false)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors"
+                    title="Hide Panel"
+                  >
+                    <ChevronUp size={20} />
+                  </button>
+                </div>
 
-            <div className="p-6 flex-1 overflow-y-auto">
+                <div className="p-6 flex-1 overflow-y-auto">
               {activeTab === 'health_card' ? (
                 <div className="space-y-6">
                   <div className="flex justify-between items-center">
@@ -712,6 +722,16 @@ export default function PatientDashboard() {
                 </form>
               ) : null}
             </div>
+              </>
+            ) : (
+              <button
+                onClick={() => setIsNavVisible(true)}
+                className="p-4 bg-white rounded-full shadow-lg text-slate-600 hover:bg-slate-50 hover:scale-105 transition-all"
+                aria-label="Show Dashboard Panel"
+              >
+                <ChevronDown size={24} />
+              </button>
+            )}
           </div>
 
           <div className="flex flex-row md:flex-col gap-4 md:gap-6">
