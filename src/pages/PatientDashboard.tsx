@@ -44,7 +44,7 @@ export default function PatientDashboard() {
   });
   const [contacts, setContacts] = useState<EmergencyContact[]>([]);
   const [medicines, setMedicines] = useState<MedicineSchedule[]>([]);
-  const [isNavVisible, setIsNavVisible] = useState(true);
+  const [isNavVisible, setIsNavVisible] = useState(false);
 
   useEffect(() => {
     const welcomeMessage = `Welcome to your patient dashboard. Top left button for voice health message. Top right button for S O S emergency. Bottom left button for medicine assistant. Bottom right button for object detection.`;
@@ -726,10 +726,11 @@ export default function PatientDashboard() {
             ) : (
               <button
                 onClick={() => setIsNavVisible(true)}
-                className="p-4 bg-white rounded-full shadow-lg text-slate-600 hover:bg-slate-50 hover:scale-105 transition-all"
+                className="px-6 py-3 bg-white rounded-full shadow-lg text-slate-600 hover:bg-slate-50 hover:scale-105 transition-all flex items-center gap-2"
                 aria-label="Show Dashboard Panel"
               >
                 <ChevronDown size={24} />
+                <span className="font-semibold">Click to view patient health card</span>
               </button>
             )}
           </div>
