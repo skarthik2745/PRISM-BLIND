@@ -45,7 +45,6 @@ export default function DoctorDashboard() {
         .slice(0, 5);
 
       const sosAlerts = localStorageService.getSOSAlertsByPatientId(patientId)
-        .filter(a => a.alert_type === 'double')
         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
         .slice(0, 5);
 

@@ -49,16 +49,29 @@ export class VoiceService {
     this.synthesis.cancel();
   }
 
-  startListening(): Promise<string> {
+  startListening(continuous: boolean = false, onResult?: (text: string) => void): Promise<string> {
     return new Promise((resolve, reject) => {
       if (!this.recognition) {
         reject(new Error('Speech recognition not supported'));
         return;
       }
 
+      this.recognition.continuous = continuous;
+      let finalTranscript = '';
+
       this.recognition.onresult = (event) => {
-        const transcript = event.results[0][0].transcript;
-        resolve(transcript.toLowerCase().trim());
+        if (!continuous) {
+          const transcript = event.results[0][0].transcript;
+          if (onResult) onResult(transcript);
+          resolve(transcript.toLowerCase().trim());
+        } else {
+          let transcript = '';
+          for (let i = 0; i < event.results.length; ++i) {
+            transcript += event.results[i][0].transcript + ' ';
+          }
+          finalTranscript = transcript;
+          if (onResult) onResult(transcript);
+        }
       };
 
       this.recognition.onerror = (event) => {
@@ -66,6 +79,9 @@ export class VoiceService {
       };
 
       this.recognition.onend = () => {
+        if (continuous) {
+          resolve(finalTranscript.toLowerCase().trim());
+        }
         this.recognition?.stop();
       };
 

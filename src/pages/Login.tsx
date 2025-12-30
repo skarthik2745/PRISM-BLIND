@@ -4,6 +4,11 @@ import { voiceService } from '../services/voiceService';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from '../hooks/useNavigate';
 
+interface User {
+  full_name: string;
+  role: 'patient' | 'doctor';
+}
+
 export default function Login() {
   const [isListening, setIsListening] = useState(false);
   const [status, setStatus] = useState('');
@@ -43,16 +48,23 @@ export default function Login() {
           return;
         }
 
-        const user = await new Promise(resolve => {
-          setTimeout(() => {
-            const currentUser = JSON.parse(localStorage.getItem('currentUser') || 'null');
-            resolve(currentUser);
-          }, 100);
-        });
+        // The `signIn` function should ideally return the user object.
+        // Reading from localStorage immediately after is a workaround that assumes
+        // `signIn` synchronously updates it. The previous `setTimeout` was a fragile
+        // way to handle asynchronous updates and has been removed for robustness.
+        const userJSON = localStorage.getItem('currentUser');
+        const user: User | null = userJSON ? JSON.parse(userJSON) : null;
 
-        await voiceService.speak(`You are successfully logged into the system. Welcome ${user?.full_name}.`);
+        if (!user) {
+          await voiceService.speak('Login failed. Could not retrieve user details. Please try again.');
+          setStatus('Login error: User details not found after sign-in.');
+          setIsListening(false);
+          return;
+        }
 
-        if (user?.role === 'patient') {
+        await voiceService.speak(`You are successfully logged into the system. Welcome ${user.full_name}.`);
+
+        if (user.role === 'patient') {
           navigate('/patient-dashboard');
         } else {
           navigate('/doctor-dashboard');
@@ -75,7 +87,7 @@ export default function Login() {
         <img
           src="/prism.jpeg"
           alt="PRISM Logo"
-          className="w-40 h-40 mx-auto mb-6 border-4 border-orange-500 object-cover shadow-lg"
+          className="w-32 h-32 md:w-40 md:h-40 mx-auto mb-6 border-4 border-orange-500 object-cover shadow-lg"
         />
         <h1 className="text-5xl md:text-6xl font-bold text-blue-900 mb-2">
           PRISM for Blind

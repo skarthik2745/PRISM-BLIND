@@ -10,12 +10,15 @@ import { MedicineSchedule, SOSAlert, EmergencyContact } from '../types';
 export default function PatientDashboard() {
   const { user, signOut } = useAuth();
   const [isRecording, setIsRecording] = useState(false);
+  const [currentTranscript, setCurrentTranscript] = useState('');
   const sosTimeoutRef = useRef<any>(null);
+  const voiceTimeoutRef = useRef<any>(null);
   const detectionLoopRef = useRef<boolean>(true);
   const videoStreamRef = useRef<MediaStream | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const lastSosPressRef = useRef<number>(0);
+  const lastVoicePressRef = useRef<number>(0);
   const [activeAlert, setActiveAlert] = useState<SOSAlert | null>(null);
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [activeTab, setActiveTab] = useState<'health_card' | 'contacts' | 'medicine'>('health_card');
@@ -82,13 +85,16 @@ export default function PatientDashboard() {
     }
   };
 
-  const handleVoiceMessage = async () => {
+  const startVoiceRecording = async () => {
     if (!isRecording) {
       setIsRecording(true);
+      setCurrentTranscript('');
       await voiceService.speak('Voice recording started. Please describe how you feel today.');
 
       try {
-        const transcript = await voiceService.startListening();
+        const transcript = await voiceService.startListening(true, (text) => {
+          setCurrentTranscript(text);
+        });
 
         const doctorId = localStorageService.getDoctorIdByPatientId(user?.id || '');
 
@@ -111,6 +117,31 @@ export default function PatientDashboard() {
       } finally {
         setIsRecording(false);
       }
+    }
+  };
+
+  const handleVoiceMessage = async () => {
+    const now = Date.now();
+    const timeDiff = now - lastVoicePressRef.current;
+
+    if (timeDiff < 1000) {
+      if (voiceTimeoutRef.current) {
+        clearTimeout(voiceTimeoutRef.current);
+        voiceTimeoutRef.current = null;
+      }
+      lastVoicePressRef.current = 0;
+
+      if (isRecording) {
+        voiceService.stopListening();
+      }
+    } else {
+      lastVoicePressRef.current = now;
+      voiceTimeoutRef.current = setTimeout(async () => {
+        if (!isRecording) {
+          await startVoiceRecording();
+        }
+        voiceTimeoutRef.current = null;
+      }, 1000);
     }
   };
 
@@ -160,40 +191,15 @@ export default function PatientDashboard() {
   };
 
   const handleDoubleSOS = async () => {
-    const contacts = localStorageService.getEmergencyContactsByPatientId(user?.id || '');
-    let voiceMessage = 'Emergency alert sent to your doctor and contacts.';
-    if (contacts.length > 0) {
-      const contactNames = contacts.map(c => c.contact_name).join(', and ');
-      voiceMessage = `Emergency alert sent to your doctor and contacts: ${contactNames}.`;
-    }
-    voiceMessage += ' Sharing your current location.';
-    await voiceService.speak(voiceMessage);
-
-    const position = await getCurrentPosition();
-
-    const alert = localStorageService.saveSOSAlert({
-      patient_id: user?.id || '',
-      alert_type: 'double',
-      latitude: position?.latitude,
-      longitude: position?.longitude,
-      status: 'active',
-    });
-
-    setActiveAlert(alert);
-    console.log('SOS Alert sent to hospital and contacts:', contacts);
-  };
-
-  const handleCancelSOS = async () => {
     if (activeAlert) {
       localStorageService.updateSOSAlert(activeAlert.id, {
         status: 'cancelled',
         cancelled_at: new Date().toISOString()
       });
-
       setActiveAlert(null);
-      await voiceService.speak('Emergency alert cancelled successfully.');
+      await voiceService.speak('SOS call cancelled.');
     } else {
-      await voiceService.speak('No active emergency alert to cancel.');
+      await voiceService.speak('SOS cancelled.');
     }
   };
 
@@ -453,19 +459,28 @@ export default function PatientDashboard() {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <div className="flex flex-row md:flex-col gap-4 md:gap-32">
-            <button
-              onClick={handleVoiceMessage}
-              className={`w-full aspect-square rounded-full flex flex-col items-center justify-center transition-all duration-300 ${
-                isRecording
-                  ? 'bg-blue-600 hover:bg-blue-700 scale-105 animate-pulse'
-                  : 'bg-blue-500 hover:bg-blue-600'
-              } text-white shadow-2xl active:scale-95 p-4`}
-              aria-label="Voice health message"
-            >
-              <MessageSquare size={80} strokeWidth={2} />
-              <span className="text-2xl md:text-3xl font-bold mt-4 text-center px-2">Voice Message</span>
-              <span className="text-lg md:text-xl mt-2 text-center px-2">Health Report</span>
-            </button>
+            <div className="w-full flex flex-col gap-2">
+              <button
+                onClick={handleVoiceMessage}
+                className={`w-full aspect-square rounded-full flex flex-col items-center justify-center transition-all duration-300 ${
+                  isRecording
+                    ? 'bg-blue-600 hover:bg-blue-700 scale-105 animate-pulse'
+                    : 'bg-blue-500 hover:bg-blue-600'
+                } text-white shadow-2xl active:scale-95 p-4`}
+                aria-label="Voice health message"
+              >
+                <MessageSquare size={80} strokeWidth={2} />
+                <span className="text-2xl md:text-3xl font-bold mt-4 text-center px-2">Voice Message</span>
+                <span className="text-lg md:text-xl mt-2 text-center px-2">Health Report</span>
+              </button>
+              {isRecording && (
+                <div className="bg-white/90 p-3 rounded-xl shadow-lg text-center border-2 border-blue-100 min-h-[60px] flex items-center justify-center">
+                  <p className="text-slate-800 font-medium animate-pulse">
+                    {currentTranscript || "Listening..."}
+                  </p>
+                </div>
+              )}
+            </div>
 
             <button
               onClick={handleSOS}
@@ -865,16 +880,6 @@ export default function PatientDashboard() {
                   ? 'Your emergency contacts have been notified.'
                   : 'Your doctor and emergency contacts have been notified with your location.'}
               </p>
-            </div>
-            <div className="flex justify-center">
-              <button
-                onClick={handleCancelSOS}
-                className="w-full md:w-96 h-24 bg-red-600 hover:bg-red-700 text-white rounded-2xl shadow-2xl flex items-center justify-center gap-4 transition-all active:scale-95"
-                aria-label="Cancel SOS"
-              >
-                <XCircle size={48} strokeWidth={2} />
-                <span className="text-3xl font-bold">Cancel SOS</span>
-              </button>
             </div>
           </div>
         )}
